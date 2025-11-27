@@ -1,0 +1,30 @@
+{
+  "name": "claude-code-context-framework",
+  "version": "1.0.0",
+  "created": "2025-11-17",
+  "updated": "2025-11-18",
+  "author": "SoEasy",
+  "project": {
+    "name": "tschannel",
+    "type": "typescript-library",
+    "architecture": "monorepo",
+    "packageManager": "pnpm",
+    "buildTool": "turborepo"
+  },
+  "required_files": ["README.md", "PROJECT.md"],
+  "recommended_files": ["LIBS.md", "CODESTYLE.md", "PR.md", "TODO.md"],
+  "optional_files": ["LANG_PREF.local.md", "store/*", "adr/*"],
+  "local_files": ["LANG_PREF.local.md", "todo/*.md"],
+  "features": {
+    "autoload": true,
+    "slashCommands": true
+  },
+  "todo_strategy": {
+    "type": "hybrid",
+    "global_file": "TODO.md",
+    "local_dir": "todo/",
+    "local_pattern": "YYYY-MM-DD-task-name.md",
+    "completion_format": "github_checkbox",
+    "ask_before_global": true
+  }
+}

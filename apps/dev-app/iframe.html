@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Bridge-Kit Iframe Child</title>
+    <style>
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 20px;
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+      }
+
+      .container {
+        text-align: center;
+        max-width: 600px;
+      }
+
+      h1 {
+        font-size: 2em;
+        margin-bottom: 10px;
+      }
+
+      p {
+        font-size: 1.1em;
+        opacity: 0.9;
+        margin-bottom: 20px;
+      }
+
+      .status {
+        background: rgba(255, 255, 255, 0.2);
+        padding: 15px;
+        border-radius: 8px;
+        margin-top: 20px;
+      }
+
+      .status.ready {
+        background: rgba(76, 175, 80, 0.3);
+      }
+
+      code {
+        background: rgba(0, 0, 0, 0.2);
+        padding: 2px 6px;
+        border-radius: 3px;
+        font-size: 0.9em;
+      }
+
+      .handlers {
+        margin-top: 30px;
+        text-align: left;
+      }
+
+      .handlers h3 {
+        margin-bottom: 10px;
+      }
+
+      .handlers ul {
+        list-style: none;
+        padding: 0;
+      }
+
+      .handlers li {
+        padding: 8px 0;
+        opacity: 0.9;
+      }
+
+      .action-btn {
+        background: rgba(255, 255, 255, 0.3);
+        border: 2px solid rgba(255, 255, 255, 0.5);
+        color: white;
+        padding: 10px 20px;
+        margin: 5px;
+        border-radius: 6px;
+        font-size: 14px;
+        font-weight: 500;
+        cursor: pointer;
+        transition: all 0.2s;
+      }
+
+      .action-btn:hover {
+        background: rgba(255, 255, 255, 0.5);
+        transform: translateY(-2px);
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+      }
+
+      .action-btn:active {
+        transform: translateY(0);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h1>🪟 Iframe Worker Side</h1>
+      <p>
+        This iframe acts as the "worker" side of the bridge, handling requests from the parent
+        window.
+      </p>
+
+      <div class="status" id="status"><strong>Status:</strong> Initializing bridge...</div>
+
+      <div class="handlers">
+        <h3>Main → Worker Handlers:</h3>
+        <ul>
+          <li><code>sendText</code>: string → string</li>
+          <li><code>calculateSquare</code>: number → number</li>
+          <li><code>getUserData</code>: {id} → User</li>
+        </ul>
+      </div>
+
+      <div class="handlers">
+        <h3>Worker → Main Actions:</h3>
+        <button id="notifyBtn" class="action-btn">Notify Parent</button>
+        <button id="logBtn" class="action-btn">Send Log to Parent</button>
+      </div>
+
+      <div class="handlers">
+        <h3>Bidirectional Actions:</h3>
+        <button id="pingBtn" class="action-btn">Ping Parent</button>
+        <button id="echoBtn" class="action-btn">Echo to Parent</button>
+      </div>
+    </div>
+
+    <script type="module" src="/src/iframe.ts"></script>
+  </body>
+</html>

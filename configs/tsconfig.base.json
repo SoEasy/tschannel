@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "compilerOptions": {
+    // Target and module
+    "target": "ES5",
+    "module": "ESNext",
+    "lib": ["ES2015", "ES2016", "ES2017"],
+
+    // Module resolution
+    "moduleResolution": "node",
+    "resolveJsonModule": true,
+    "esModuleInterop": true,
+
+    // Type checking
+    "strict": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+
+    // Emit
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true,
+    "downlevelIteration": true,
+
+    // Interop constraints
+    "allowSyntheticDefaultImports": true,
+    "isolatedModules": true
+  },
+  "exclude": ["node_modules", "dist", "build", "coverage"]
+}

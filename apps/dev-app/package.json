@@ -1,0 +1,23 @@
+{
+  "name": "dev-app",
+  "version": "0.0.2",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@tschannel/core": "workspace:*",
+    "@tschannel/iframe-channel": "workspace:^",
+    "@tschannel/pubsub-channel": "workspace:*",
+    "@solidjs/router": "^0.15.4",
+    "solid-js": "^1.9.3"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.3",
+    "vite": "^6.0.7",
+    "vite-plugin-solid": "^2.10.2"
+  }
+}

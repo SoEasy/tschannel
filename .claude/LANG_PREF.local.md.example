@@ -1,0 +1,39 @@
+# Language Preferences (Personal Configuration)
+
+This file contains **personal language preferences** for communication with Claude Code.
+
+## 🔧 Setup Instructions
+
+1. Copy this file to `LANG_PREF.local.md` (it's in .gitignore):
+   ```bash
+   cp .claude/LANG_PREF.local.md.example .claude/LANG_PREF.local.md
+   ```
+
+2. Edit `LANG_PREF.local.md` with your preferred language
+
+3. Claude Code will automatically read your preferences from the local file
+
+## 📝 Configuration
+
+Uncomment and set your preferred language for communication:
+
+```markdown
+# Communication Language
+
+<!-- Choose ONE option below and uncomment it: -->
+
+<!-- Option 1: English (default for international projects) -->
+<!-- **Communication with me**: English -->
+
+<!-- Option 2: Russian -->
+<!-- **Communication with me**: Russian -->
+
+<!-- Option 3: Your language -->
+<!-- **Communication with me**: [Your Language] -->
+```
+
+## 📚 Note
+
+This setting **only affects** how Claude communicates with you in explanations and discussions.
+
+**All code, documentation, and commit messages remain in English** as specified in `.claude/README.md`.

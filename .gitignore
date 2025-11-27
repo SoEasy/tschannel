@@ -1,0 +1,21 @@
+# See https://git-scm.com/docs/gitignore
+.idea/
+node_modules/
+coverage/
+.local
+.claude/LANG_PREF.local.md
+.claude/todo/*.md
+!.claude/todo/README.md
+!.claude/todo/TEMPLATE.md
+.mcp.json
+
+# Package builds
+packages/*/dist
+packages/*/build
+
+# Turborepo
+.turbo
+
+# Changesets
+.changeset/*.md
+!.changeset/README.md
