@@ -31,6 +31,11 @@ export type TIframeChannelConfig<TSide extends TBridgeSide> = TChannelConfig<TSi
    * - Leave undefined to accept from any origin (not recommended for production)
    */
   expectedOrigin?: string;
+
+  /**
+   * If true - channel won`t send console messages
+   */
+  silent?: boolean;
 };
 
 /**
@@ -83,6 +88,7 @@ export class IframeChannel<TSide extends TBridgeSide> implements IChannel<TSide>
   private readonly targetOrigin: string;
   private readonly expectedOrigin?: string;
   private readonly targetWindow: Window;
+  private readonly silent: boolean;
 
   /**
    * Creates a new IframeChannel instance
@@ -100,6 +106,7 @@ export class IframeChannel<TSide extends TBridgeSide> implements IChannel<TSide>
     this.serializer = config.serializer || DEFAULT_SERIALIZER;
     this.targetOrigin = config.targetOrigin || '*';
     this.expectedOrigin = config.expectedOrigin;
+    this.silent = config.silent || false;
     this.boundHandleMessage = this.handleMessage.bind(this);
 
     // Determine target window based on side
@@ -183,9 +190,11 @@ export class IframeChannel<TSide extends TBridgeSide> implements IChannel<TSide>
   private handleMessage(event: MessageEvent): void {
     // Validate origin if expectedOrigin is specified
     if (this.expectedOrigin && event.origin !== this.expectedOrigin) {
-      console.warn(
-        `IframeChannel: Rejected message from unexpected origin. Expected: ${this.expectedOrigin}, Got: ${event.origin}`
-      );
+      if (!this.silent) {
+        console.warn(
+          `IframeChannel: Rejected message from unexpected origin. Expected: ${this.expectedOrigin}, Got: ${event.origin}`
+        );
+      }
       return;
     }
 
@@ -198,7 +207,9 @@ export class IframeChannel<TSide extends TBridgeSide> implements IChannel<TSide>
       const deserialized = this.serializer.deserialize(event.data);
       this.messageHandler(deserialized);
     } catch (error) {
-      console.error('IframeChannel: Failed to deserialize message', error);
+      if (!this.silent) {
+        console.error('IframeChannel: Failed to deserialize message', error);
+      }
     }
   }
 }

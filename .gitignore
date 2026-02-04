@@ -7,7 +7,6 @@ coverage/
 .claude/todo/*.md
 !.claude/todo/README.md
 !.claude/todo/TEMPLATE.md
-.mcp.json
 
 # Package builds
 packages/*/dist
