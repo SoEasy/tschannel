@@ -1,5 +1,12 @@
 # dev-app
 
+## 0.0.3
+
+### Patch Changes
+
+- Updated dependencies
+  - @tschannel/iframe-channel@0.0.3
+
 ## 0.0.2
 
 ### Patch Changes

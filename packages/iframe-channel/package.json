@@ -1,6 +1,6 @@
 {
   "name": "@tschannel/iframe-channel",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "description": "Iframe channel implementation for tschannel - cross-frame communication via postMessage",
   "author": "SoEasy",
   "license": "MIT",
