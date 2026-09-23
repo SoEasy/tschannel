@@ -1,0 +1,42 @@
+schema: spec-driven
+
+context: |
+  tschannel is a pnpm 10 TypeScript monorepo for type-safe bidirectional communication across JavaScript execution contexts.
+  Published packages live under packages/: @tschannel/core, @tschannel/pubsub-channel, and @tschannel/iframe-channel.
+  The SolidJS/Vite application under apps/dev-app is a development and demonstration consumer of those packages.
+  Packages are ESM-only, target ES5 output, use Rollup and API Extractor, and publish generated files from dist/.
+  Channel packages depend on @tschannel/core through peer dependencies and workspace development dependencies.
+  Use named exports and preserve public package entry points, API compatibility, and package boundaries unless a change explicitly scopes modifications to them.
+  Code, repository documentation, comments, artifact text, and commit messages are written in English.
+  Commits follow Conventional Commits. Published-package behavior changes require a Changesets release decision.
+  Generated dist/ and build/ artifacts are not committed.
+  Project conventions and commands are documented in .ai/README.md, .ai/PROJECT.md, .ai/CODESTYLE.md, and .ai/LIBS.md.
+
+rules:
+  proposal:
+    - State user or developer value, affected packages or applications, and explicit non-goals.
+    - Call out public API, package manifest, compatibility, release, and migration impact when relevant.
+  specs:
+    - Describe observable behavior and constraints rather than implementation details.
+    - Give every requirement at least one concrete WHEN/THEN scenario.
+    - Preserve the full capability path when modifying an existing capability.
+  design:
+    - Document decisions that affect architecture, package boundaries, public APIs, compatibility, or multiple tools.
+    - Record meaningful alternatives, trade-offs, risks, migration, and rollback; omit incidental implementation detail.
+  tasks:
+    - Make tasks independently verifiable and order them by dependency.
+    - Include focused tests or checks for the affected area and repository-wide checks proportional to risk.
+    - Include an explicit Changesets decision for changes that may affect a published package.
+    - Do not mark a task complete until its implementation and verification are complete.
+
+operations:
+  apply:
+    guidance:
+      - Read all completed planning artifacts before implementation and keep edits within the approved scope.
+      - Run focused checks first, then the relevant lint, typecheck, test, format, and build checks proportional to the change.
+      - Do not commit generated dist/ or build/ artifacts.
+      - Keep task checkboxes synchronized with verified implementation progress.
+  archive:
+    guidance:
+      - Archive only after all tasks are complete and the change validates successfully.
+      - Confirm whether a Changesets file is required before archiving changes to published packages.

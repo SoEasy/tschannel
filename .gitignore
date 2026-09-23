@@ -1,0 +1,16 @@
+# See https://git-scm.com/docs/gitignore
+.idea/
+node_modules/
+coverage/
+.local
+.ai/LANG_PREF.local.md
+
+.agents/skills/openspec*
+.agents/skills/.openspec*
+
+# Package builds
+packages/*/dist
+packages/*/build
+
+# Turborepo
+.turbo
