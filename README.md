@@ -567,8 +567,6 @@ pnpm format
 5. Create a changeset: `pnpm changeset`
 6. Submit a pull request
 
-For detailed contribution guidelines, see [CONTRIBUTING.md](.ai/README.md).
-
 ## Requirements
 
 - **Node.js**: >= 18
