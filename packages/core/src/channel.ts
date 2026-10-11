@@ -6,16 +6,16 @@ import type { TBridgeSide, TInternalMessage, TSerializer } from './types';
 export interface IChannel<TSide extends TBridgeSide> {
   readonly side: TSide;
 
-  /** Initialize connection and setup listeners */
+  /** Initialize the local transport after the incoming handler has been registered */
   initialize(): Promise<void> | void;
 
   /** Send message through the channel */
   send(message: TInternalMessage): void;
 
-  /** Subscribe to incoming messages */
+  /** Register the incoming handler; this must be supported before initialize() */
   onMessage(handler: (message: TInternalMessage) => void): void;
 
-  /** Check if channel is ready to send/receive messages */
+  /** Check if the local transport is ready to send/receive protocol envelopes */
   isReady(): boolean;
 
   /** Clean up resources */

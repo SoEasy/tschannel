@@ -1,8 +1,8 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { Bridge } from './../src/bridge';
 import { NamespaceBuilder } from './../src/builder';
 import type { IChannel } from './../src/channel';
-import { TBridgeSide, TInternalMessage } from './../src/types';
+import type { TBridgeSide, TInternalMessage } from './../src/types';
 
 // Test Channel implementation using simple pub-sub pattern
 class TestChannel<TSide extends TBridgeSide> implements IChannel<TSide> {
@@ -83,10 +83,19 @@ const testNamespace = new NamespaceBuilder('test')
 describe('Bridge security mechanisms', () => {
   let channel: TestChannel<'main'>;
   let bridge: Bridge<typeof testNamespace, typeof channel>;
+  let peerBridge: Bridge<typeof testNamespace, TestChannel<'worker'>>;
 
-  beforeEach(() => {
-    channel = new TestChannel({ side: 'main' });
-    bridge = new Bridge(testNamespace, channel);
+  beforeEach(async () => {
+    const [mainChannel, workerChannel] = TestChannel.createPair();
+    channel = mainChannel;
+    bridge = new Bridge(testNamespace, channel, { timeout: 100 });
+    peerBridge = new Bridge(testNamespace, workerChannel);
+    await Promise.all([bridge.ready(), peerBridge.ready()]);
+  });
+
+  afterEach(() => {
+    bridge.destroy();
+    peerBridge.destroy();
   });
 
   it('creates bridge instance', () => {
@@ -94,11 +103,11 @@ describe('Bridge security mechanisms', () => {
     expect(bridge.isReady()).toBe(true);
   });
 
-  it('rejects dispatch when channel is not ready', async () => {
+  it('rejects dispatch when bridge is destroyed', async () => {
     bridge.destroy();
 
     const pingMessage = testNamespace.send.ping();
-    await expect(bridge.dispatch(pingMessage)).rejects.toThrow(Bridge.ERRORS.CHANNEL_NOT_READY);
+    await expect(bridge.dispatch(pingMessage)).rejects.toThrow(Bridge.ERRORS.BRIDGE_DESTROYED);
   });
 
   it('rejects dispatch when namespace mismatch', async () => {
@@ -113,24 +122,14 @@ describe('Bridge security mechanisms', () => {
     };
 
     // @ts-expect-error - Testing runtime validation
-    await expect(bridge.dispatch(wrongMessage)).rejects.toThrow(
-      Bridge.ERRORS.NAMESPACE_MISMATCH('wrong', 'test')
-    );
+    await expect(bridge.dispatch(wrongMessage)).rejects.toThrow(Bridge.ERRORS.NAMESPACE_MISMATCH('wrong', 'test'));
   });
 
   it('times out when no response received', async () => {
+    peerBridge.listen(testNamespace.message.ping, () => new Promise<string>(() => undefined));
     const message = testNamespace.send.ping(undefined);
-    const bridgeWithShortTimeout = new Bridge<typeof testNamespace, typeof channel>(
-      testNamespace,
-      channel,
-      {
-        timeout: 100,
-      }
-    );
 
-    await expect(bridgeWithShortTimeout.dispatch(message)).rejects.toThrow(
-      Bridge.ERRORS.TIMEOUT('ping')
-    );
+    await expect(bridge.dispatch(message)).rejects.toThrow(Bridge.ERRORS.TIMEOUT('ping'));
   });
 
   it('registers message handler', () => {
@@ -183,9 +182,7 @@ describe('Bridge security mechanisms', () => {
     };
 
     // @ts-expect-error - Testing runtime validation
-    await expect(bridge.dispatch(invalidMessage)).rejects.toThrow(
-      Bridge.ERRORS.INVALID_MESSAGE_INSTANCE
-    );
+    await expect(bridge.dispatch(invalidMessage)).rejects.toThrow(Bridge.ERRORS.INVALID_MESSAGE_INSTANCE);
   });
 
   it('throws when listen receives message with wrong meta type (forSend instead of forListen)', () => {
@@ -364,9 +361,7 @@ describe('Communication', () => {
     it('handles missing handler for message', async () => {
       const message = testNamespace.send.calculate({ value: 5 });
 
-      await expect(bridgeWorker.dispatch(message)).rejects.toThrow(
-        Bridge.ERRORS.NO_HANDLER('calculate')
-      );
+      await expect(bridgeWorker.dispatch(message)).rejects.toThrow(Bridge.ERRORS.NO_HANDLER('calculate'));
     });
   });
 });
@@ -468,11 +463,7 @@ describe('Middleware', () => {
     const message = testNamespace.send.calculate({ value: 5 });
 
     await expect(bridgeWorker.dispatch(message)).rejects.toThrow('Test error');
-    expect(errorSpy).toHaveBeenCalledWith(
-      testNamespace.namespaceName,
-      'calculate',
-      expect.any(Error)
-    );
+    expect(errorSpy).toHaveBeenCalledWith(testNamespace.namespaceName, 'calculate', expect.any(Error));
   });
 
   it('calls error middleware on handler side', async () => {
@@ -489,11 +480,7 @@ describe('Middleware', () => {
     const message = testNamespace.send.calculate({ value: 5 });
 
     await expect(bridgeWorker.dispatch(message)).rejects.toThrow('Test error');
-    expect(errorSpy).toHaveBeenCalledWith(
-      testNamespace.namespaceName,
-      'calculate',
-      expect.any(Error)
-    );
+    expect(errorSpy).toHaveBeenCalledWith(testNamespace.namespaceName, 'calculate', expect.any(Error));
   });
 
   it('applies multiple middleware in order', async () => {

@@ -42,16 +42,11 @@ const IframeDemo: Component = () => {
         <div class="iframe-info">
           <h3>Iframe Communication</h3>
           <p>
-            Parent window communicates with iframe below using <code>postMessage</code> API. The
-            iframe contains the "worker" side that handles requests.
+            Parent window communicates with iframe below using <code>postMessage</code> API. The iframe contains the
+            "worker" side that handles requests.
           </p>
         </div>
-        <iframe
-          ref={iframeRef}
-          src="/iframe.html"
-          class="demo-iframe"
-          title="Bridge-Kit Iframe Demo"
-        />
+        <iframe ref={iframeRef} src="/iframe.html" class="demo-iframe" title="Bridge-Kit Iframe Demo" />
       </div>
 
       <Show when={bridge()} fallback={<div class="loading">Initializing iframe bridge...</div>}>

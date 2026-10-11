@@ -16,9 +16,7 @@ try {
   if (notifyBtn) {
     notifyBtn.addEventListener('click', async () => {
       try {
-        await bridge.dispatch(
-          send.notifyParent(`Important event at ${new Date().toLocaleTimeString()}`)
-        );
+        await bridge.dispatch(send.notifyParent(`Important event at ${new Date().toLocaleTimeString()}`));
         console.log('[Iframe] Sent notification to parent');
       } catch (error) {
         console.error('[Iframe] Failed to send notification:', error);

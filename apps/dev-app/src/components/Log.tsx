@@ -45,14 +45,12 @@ const Log: Component<Props> = (props) => {
             <div class={`log-entry ${log.side.toLowerCase()} ${log.type}`}>
               <span class="log-time">{log.timestamp.toLocaleTimeString()}</span>
               <span class="log-side">{log.side}</span>
-              <span class={`log-type ${log.type}`}>{log.type === 'sent' ? 'í' : 'ê'}</span>
+              <span class={`log-type ${log.type}`}>{log.type === 'sent' ? 'ÔøΩ' : 'ÔøΩ'}</span>
               <span class="log-message">{log.message}</span>
             </div>
           )}
         </For>
-        {logs().length === 0 && (
-          <div class="empty-state">No messages yet. Try sending something!</div>
-        )}
+        {logs().length === 0 && <div class="empty-state">No messages yet. Try sending something!</div>}
       </div>
     </div>
   );

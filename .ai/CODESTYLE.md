@@ -392,12 +392,7 @@ createBridge({
 });
 
 // ❌ Bad: Many individual arguments
-function createBridge(
-  channel: IChannel,
-  namespace: string,
-  timeout?: number,
-  retryCount?: number
-): Bridge {}
+function createBridge(channel: IChannel, namespace: string, timeout?: number, retryCount?: number): Bridge {}
 ```
 
 ---

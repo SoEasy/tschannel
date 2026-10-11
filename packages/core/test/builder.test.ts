@@ -340,13 +340,9 @@ describe('Integration', () => {
 
   describe('Multiple namespaces', () => {
     it('different namespaces do not interfere with each other', () => {
-      const ns1 = new NamespaceBuilder('namespace1')
-        .bidirectionalMessage<string, string>()('test')
-        .build();
+      const ns1 = new NamespaceBuilder('namespace1').bidirectionalMessage<string, string>()('test').build();
 
-      const ns2 = new NamespaceBuilder('namespace2')
-        .bidirectionalMessage<number, number>()('test')
-        .build();
+      const ns2 = new NamespaceBuilder('namespace2').bidirectionalMessage<number, number>()('test').build();
 
       expect(ns1.message.test.namespace).toBe('namespace1');
       expect(ns2.message.test.namespace).toBe('namespace2');

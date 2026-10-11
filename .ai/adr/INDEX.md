@@ -35,7 +35,8 @@ Decision content must be provided or explicitly confirmed by the user; an agent 
 
 ## Records
 
-| Number | Title | Status | Date |
-| ------ | ----- | ------ | ---- |
+| Number | Title                                                                             | Status   | Date       |
+| ------ | --------------------------------------------------------------------------------- | -------- | ---------- |
+| 0001   | [Own a symmetric handshake in the core protocol](0001-core-handshake-protocol.md) | proposed | 2026-10-11 |
 
 The Title cell links to the corresponding ADR file.

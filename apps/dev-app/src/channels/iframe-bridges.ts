@@ -30,10 +30,7 @@ export const initParentBridge = (iframe: HTMLIFrameElement) => {
     expectedOrigin: window.location.origin,
   });
 
-  parentBridge = new Bridge<typeof demoNamespace, typeof parentChannel>(
-    demoNamespace,
-    parentChannel
-  );
+  parentBridge = new Bridge<typeof demoNamespace, typeof parentChannel>(demoNamespace, parentChannel);
 
   // Setup handlers for Worker → Main messages (parent receives events from iframe)
   parentBridge.listen(messages.notifyParent, async (message) => {

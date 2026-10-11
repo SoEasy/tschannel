@@ -1,6 +1,6 @@
 {
   "name": "@tschannel/iframe-channel",
-  "version": "0.0.3",
+  "version": "0.0.4",
   "description": "Iframe channel implementation for tschannel - cross-frame communication via postMessage",
   "author": "SoEasy",
   "license": "MIT",
@@ -35,7 +35,7 @@
     "lint:fix": "eslint src --ext .ts --fix"
   },
   "peerDependencies": {
-    "@tschannel/core": "^0.0.2"
+    "@tschannel/core": "^0.1.0"
   },
   "devDependencies": {
     "@tschannel/core": "workspace:*"

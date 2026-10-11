@@ -1,10 +1,10 @@
 import {
   DEFAULT_SERIALIZER,
   type IChannel,
+  type TBridgeSide,
   type TChannelConfig,
   type TInternalMessage,
   type TSerializer,
-  type TBridgeSide,
 } from '@tschannel/core';
 
 /**
@@ -84,7 +84,6 @@ export class IframeChannel<TSide extends TBridgeSide> implements IChannel<TSide>
   private messageHandler?: (message: TInternalMessage) => void;
   private isInitialized = false;
   private serializer: TSerializer;
-  private boundHandleMessage: (event: MessageEvent) => void;
   private readonly targetOrigin: string;
   private readonly expectedOrigin?: string;
   private readonly targetWindow: Window;
@@ -107,7 +106,6 @@ export class IframeChannel<TSide extends TBridgeSide> implements IChannel<TSide>
     this.targetOrigin = config.targetOrigin || '*';
     this.expectedOrigin = config.expectedOrigin;
     this.silent = config.silent || false;
-    this.boundHandleMessage = this.handleMessage.bind(this);
 
     // Determine target window based on side
     if (config.side === 'main') {
@@ -133,7 +131,7 @@ export class IframeChannel<TSide extends TBridgeSide> implements IChannel<TSide>
       return;
     }
 
-    window.addEventListener('message', this.boundHandleMessage);
+    window.addEventListener('message', this.handleMessage);
     this.isInitialized = true;
   }
 
@@ -175,7 +173,7 @@ export class IframeChannel<TSide extends TBridgeSide> implements IChannel<TSide>
    */
   destroy(): void {
     if (this.isInitialized) {
-      window.removeEventListener('message', this.boundHandleMessage);
+      window.removeEventListener('message', this.handleMessage);
     }
 
     this.messageHandler = undefined;
@@ -187,7 +185,7 @@ export class IframeChannel<TSide extends TBridgeSide> implements IChannel<TSide>
    *
    * @param event - MessageEvent from postMessage
    */
-  private handleMessage(event: MessageEvent): void {
+  private handleMessage = (event: MessageEvent): void => {
     // Validate origin if expectedOrigin is specified
     if (this.expectedOrigin && event.origin !== this.expectedOrigin) {
       if (!this.silent) {
@@ -211,5 +209,5 @@ export class IframeChannel<TSide extends TBridgeSide> implements IChannel<TSide>
         console.error('IframeChannel: Failed to deserialize message', error);
       }
     }
-  }
+  };
 }

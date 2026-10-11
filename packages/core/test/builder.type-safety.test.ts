@@ -10,9 +10,7 @@ import { NamespaceBuilder } from '../src/builder';
 describe('Builder Type Safety', () => {
   describe('Message directions', () => {
     it('mainToWorker messages have correct direction type', () => {
-      const ns = new NamespaceBuilder('test')
-        .mainToWorkerMessage<string, number>()('calculate')
-        .build();
+      const ns = new NamespaceBuilder('test').mainToWorkerMessage<string, number>()('calculate').build();
 
       const msg = ns.send.calculate('test');
       expectTypeOf(msg.meta.direction).toEqualTypeOf<'mainToWorker'>();
@@ -22,9 +20,7 @@ describe('Builder Type Safety', () => {
     });
 
     it('workerToMain messages have correct direction type', () => {
-      const ns = new NamespaceBuilder('test')
-        .workerToMainMessage<string, number>()('report')
-        .build();
+      const ns = new NamespaceBuilder('test').workerToMainMessage<string, number>()('report').build();
 
       const msg = ns.send.report('data');
       expectTypeOf(msg.meta.direction).toEqualTypeOf<'workerToMain'>();
@@ -34,9 +30,7 @@ describe('Builder Type Safety', () => {
     });
 
     it('bidirectional messages have correct direction type', () => {
-      const ns = new NamespaceBuilder('test')
-        .bidirectionalMessage<string, number>()('sync')
-        .build();
+      const ns = new NamespaceBuilder('test').bidirectionalMessage<string, number>()('sync').build();
 
       const msg = ns.send.sync('data');
       expectTypeOf(msg.meta.direction).toEqualTypeOf<'bidirectional'>();
@@ -94,9 +88,7 @@ describe('Builder Type Safety', () => {
         data: { name: string; age: number };
       };
 
-      const ns2 = new NamespaceBuilder('complex')
-        .bidirectionalMessage<TComplexRequest, void>()('process')
-        .build();
+      const ns2 = new NamespaceBuilder('complex').bidirectionalMessage<TComplexRequest, void>()('process').build();
 
       // @ts-expect-error - missing 'action' field
       ns2.send.process({ userId: '123', data: { name: 'John', age: 30 } });
@@ -117,9 +109,7 @@ describe('Builder Type Safety', () => {
         action: 'create' | 'update' | 'delete';
       };
 
-      const ns2 = new NamespaceBuilder('literal')
-        .bidirectionalMessage<TRequest, void>()('action')
-        .build();
+      const ns2 = new NamespaceBuilder('literal').bidirectionalMessage<TRequest, void>()('action').build();
 
       // @ts-expect-error - 'invalid' is not assignable to 'create' | 'update' | 'delete'
       ns2.send.action({ action: 'invalid' });
@@ -152,13 +142,9 @@ describe('Builder Type Safety', () => {
   });
 
   describe('Namespace isolation', () => {
-    const ns1 = new NamespaceBuilder('users')
-      .bidirectionalMessage<{ id: string }, { name: string }>()('get')
-      .build();
+    const ns1 = new NamespaceBuilder('users').bidirectionalMessage<{ id: string }, { name: string }>()('get').build();
 
-    const ns2 = new NamespaceBuilder('posts')
-      .bidirectionalMessage<{ id: number }, { title: string }>()('get')
-      .build();
+    const ns2 = new NamespaceBuilder('posts').bidirectionalMessage<{ id: number }, { title: string }>()('get').build();
 
     it('messages from different namespaces are not compatible', () => {
       // @ts-expect-error - namespace mismatch: 'users' vs 'posts'
@@ -338,9 +324,7 @@ describe('Builder Type Safety', () => {
     it('supports union types in request', () => {
       type TUnionRequest = { type: 'create'; name: string } | { type: 'delete'; id: number };
 
-      const ns = new NamespaceBuilder('union')
-        .bidirectionalMessage<TUnionRequest, void>()('action')
-        .build();
+      const ns = new NamespaceBuilder('union').bidirectionalMessage<TUnionRequest, void>()('action').build();
 
       // @ts-expect-error - invalid discriminant value
       ns.send.action({ type: 'update', name: 'test' });
@@ -358,9 +342,7 @@ describe('Builder Type Safety', () => {
         optional?: number;
       };
 
-      const ns = new NamespaceBuilder('optional')
-        .bidirectionalMessage<TOptionalRequest, void>()('send')
-        .build();
+      const ns = new NamespaceBuilder('optional').bidirectionalMessage<TOptionalRequest, void>()('send').build();
 
       // @ts-expect-error - missing required field
       ns.send.send({ optional: 123 });
@@ -377,9 +359,7 @@ describe('Builder Type Safety', () => {
         items: Array<{ id: string; value: number }>;
       };
 
-      const ns = new NamespaceBuilder('array')
-        .bidirectionalMessage<TArrayRequest, void>()('bulk')
-        .build();
+      const ns = new NamespaceBuilder('array').bidirectionalMessage<TArrayRequest, void>()('bulk').build();
 
       // @ts-expect-error - items should be array, not object
       ns.send.bulk({ items: { id: 'test', value: 1 } });

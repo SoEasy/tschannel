@@ -81,9 +81,7 @@ const DemoControls: Component<Props> = (props) => {
     if (!props.bridgeB) return;
     try {
       addLog('Worker', 'sent', 'notifyParent to Main');
-      await props.bridgeB.dispatch(
-        send.notifyParent(`Event at ${new Date().toLocaleTimeString()}`)
-      );
+      await props.bridgeB.dispatch(send.notifyParent(`Event at ${new Date().toLocaleTimeString()}`));
       addLog('Worker', 'sent', 'Notification sent (no response expected)');
     } catch (error) {
       addLog('Worker', 'sent', `Error: ${error}`);

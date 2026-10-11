@@ -13,10 +13,7 @@ const ChannelSwitcher: Component = () => {
       <A href="/" class={`channel-tab ${currentPath() === '/' ? 'active' : ''}`}>
         📡 PubSub Channel
       </A>
-      <A
-        href="/iframe-channel"
-        class={`channel-tab ${currentPath() === '/iframe-channel' ? 'active' : ''}`}
-      >
+      <A href="/iframe-channel" class={`channel-tab ${currentPath() === '/iframe-channel' ? 'active' : ''}`}>
         🪟 Iframe Channel
       </A>
     </div>

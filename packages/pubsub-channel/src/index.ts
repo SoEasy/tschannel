@@ -1,10 +1,10 @@
 import {
+  DEFAULT_SERIALIZER,
   type IChannel,
+  type TBridgeSide,
   type TChannelConfig,
   type TInternalMessage,
   type TSerializer,
-  type TBridgeSide,
-  DEFAULT_SERIALIZER,
 } from '@tschannel/core';
 
 /**

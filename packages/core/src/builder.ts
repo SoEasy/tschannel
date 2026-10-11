@@ -242,10 +242,7 @@ export class NamespaceMessages<
   get send(): TSendMethods<TNamespaceName, TMessages> {
     if (!this.sendObjectCache) {
       this.sendObjectCache = this.messages.reduce(
-        (
-          acc: TSendMethods<TNamespaceName, TMessages>,
-          message
-        ): TSendMethods<TNamespaceName, TMessages> => ({
+        (acc: TSendMethods<TNamespaceName, TMessages>, message): TSendMethods<TNamespaceName, TMessages> => ({
           ...acc,
           [message.name]: (payload: TMessages[typeof message.name]['request']) => ({
             namespace: this.namespaceName,

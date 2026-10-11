@@ -21,6 +21,7 @@ Working with iframes, service workers, Chrome extensions, and other isolated Jav
 - **Namespace-based Organization**: Group related messages into logical namespaces
 - **Middleware Support**: Intercept and transform messages at any stage
 - **Promise-based API**: Modern async/await friendly interface
+- **Protocol Readiness**: A built-in handshake selects one peer before application traffic starts
 
 ### Supported Environments
 
@@ -107,6 +108,9 @@ const channel = new IframeChannel({
 // Create bridge
 const bridge = new Bridge(myNamespace, channel);
 
+// Optional when startup work must wait explicitly. dispatch() waits automatically.
+await bridge.ready();
+
 // Setup message handlers
 bridge.listen(messages.notify, async (message: string) => {
   console.log('Notification from iframe:', message);
@@ -139,6 +143,8 @@ const channel = new IframeChannel({
 
 // Create bridge
 const bridge = new Bridge(myNamespace, channel);
+
+await bridge.ready();
 
 // Setup message handlers
 bridge.listen(messages.greet, async (greeting: string) => {
@@ -178,6 +184,7 @@ const namespace = new NamespaceBuilder('namespace-name')
 ```
 
 **Message Directions:**
+
 - `mainToWorkerMessage` - Can only be sent from main side to worker side
 - `workerToMainMessage` - Can only be sent from worker side to main side
 - `bidirectionalMessage` - Can be sent from either side
@@ -198,6 +205,7 @@ interface IChannel<TSide extends 'main' | 'worker'> {
 ```
 
 **Available Channels:**
+
 - `IframeChannel` - For iframe communication via postMessage
 - `PubSubChannel` - For in-memory same-context communication (testing)
 
@@ -207,9 +215,18 @@ The `Bridge` class manages message sending, receiving, and routing:
 
 ```typescript
 const bridge = new Bridge(namespace, channel, {
-  timeout: 10000,  // Request timeout in ms (default: 10000)
-  retries: 3,      // Retry attempts (default: 3)
+  timeout: 10000, // Request timeout in ms (default: 10000)
+  retries: 3, // Retry attempts (default: 3)
+  handshake: {
+    timeout: 10000, // Time allowed to establish a peer session
+    retryInterval: 1000, // Retry an addressed SELECT after a lost confirmation
+  },
 });
+
+// Local channel initialization is not enough: readiness means that a remote
+// main/worker peer has completed the protocol handshake.
+await bridge.ready();
+console.log(bridge.isReady()); // true
 
 // Send messages
 const response = await bridge.dispatch(send.messageName(payload));
@@ -232,6 +249,23 @@ bridge.use({
   },
 });
 ```
+
+### Handshake and readiness
+
+Every bridge registers its channel receiver, initializes the local transport, and then announces
+itself with a versioned `HELLO`. Main selects one compatible worker with `SELECT`; the worker
+confirms the session with `CONNECTED`. Both startup orders work, and there is intentionally no
+`HELLO_RESPONSE` message or periodic discovery polling.
+
+`channel.isReady()` describes only the local transport. `bridge.isReady()` becomes `true` after
+the remote session is established, while `bridge.ready()` exposes the shared readiness promise.
+Calling `dispatch()` before that point queues the request behind the handshake; its request timeout
+starts only after the application envelope is sent.
+
+The first wire protocol uses an exact version match. Application requests, responses, and errors
+carry endpoint and session identifiers, so unrelated traffic on a shared transport is ignored.
+This handshake establishes a session but does not provide heartbeat, disconnect detection, peer
+replacement, or automatic reconnection.
 
 ## Advanced Features
 
@@ -281,7 +315,8 @@ import { TSerializer } from '@tschannel/core';
 
 const customSerializer: TSerializer = {
   serialize: (message) => {
-    // Custom serialization logic
+    // Preserve every field and discriminant. TInternalMessage includes both
+    // family: 'control' handshake frames and family: 'application' frames.
     return JSON.stringify(message);
   },
   deserialize: (data) => {
@@ -350,6 +385,10 @@ class WebSocketChannel implements IChannel<'main'> {
 }
 ```
 
+The bridge calls `onMessage()` before `initialize()`, so a custom channel must accept receiver
+registration before local initialization. The bridge intentionally ignores frames delivered before
+`initialize()` succeeds; after that point the symmetric `HELLO` announcements resume negotiation.
+
 ## Examples
 
 ### Chrome Extension (Background ↔ Content Script) (in progress)
@@ -406,6 +445,7 @@ const bridge = new Bridge(namespace, channel);
 Builder for creating type-safe message namespaces.
 
 **Methods:**
+
 - `mainToWorkerMessage<TReq, TRes>()('name')` - Define main→worker message
 - `workerToMainMessage<TReq, TRes>()('name')` - Define worker→main message
 - `bidirectionalMessage<TReq, TRes>()('name')` - Define bidirectional message
@@ -416,15 +456,18 @@ Builder for creating type-safe message namespaces.
 Main class for managing bidirectional communication.
 
 **Constructor:**
+
 ```typescript
 new Bridge(namespace, channel, config?)
 ```
 
 **Methods:**
+
 - `dispatch(message)` - Send a message and wait for response
 - `listen(messageType, handler)` - Register handler for incoming messages
 - `use(middleware)` - Add middleware
-- `isReady()` - Check if bridge is ready
+- `ready()` - Wait for protocol-session establishment or its failure
+- `isReady()` - Check protocol readiness (not merely local channel readiness)
 - `destroy()` - Clean up resources
 
 #### `IChannel<TSide>`
@@ -432,6 +475,7 @@ new Bridge(namespace, channel, config?)
 Interface for implementing custom transport channels.
 
 **Required Methods:**
+
 - `initialize()` - Setup channel
 - `send(message)` - Send message through transport
 - `onMessage(handler)` - Subscribe to incoming messages
@@ -445,6 +489,7 @@ Interface for implementing custom transport channels.
 Channel implementation for iframe communication.
 
 **Constructor:**
+
 ```typescript
 new IframeChannel({
   side: 'main' | 'worker',
@@ -462,6 +507,7 @@ new IframeChannel({
 In-memory channel for same-context communication.
 
 **Constructor:**
+
 ```typescript
 new PubSubChannel({
   side: 'main' | 'worker',
@@ -577,6 +623,7 @@ pnpm format
 ## Browser Compatibility
 
 tschannel works in all modern browsers that support:
+
 - ES6 Promises
 - EventTarget API
 - postMessage API (for iframe communication)
