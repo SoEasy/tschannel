@@ -6,6 +6,7 @@ import {
   type TEndpointId,
   type THandshakeConnected,
   type THandshakeHello,
+  type THandshakeMessage,
   type THandshakeReject,
   type THandshakeRejectReason,
   type THandshakeSelect,
@@ -28,13 +29,63 @@ export type TBridgeConfig = {
   handshake?: THandshakeConfig;
 };
 
-/** Middleware for Bridge application-message processing. */
+/** Lifecycle phase captured by a Bridge observer. */
+export type TObservePhase =
+  | 'dispatchStarted'
+  | 'sendPrepared'
+  | 'requestSent'
+  | 'requestReceived'
+  | 'handlePrepared'
+  | 'handled'
+  | 'responsePrepared'
+  | 'responseSent'
+  | 'responseReceived'
+  | 'completed'
+  | 'controlSent'
+  | 'controlReceived'
+  | 'failed';
+
+/** Application or control context captured at an observation phase. */
+export type TObservedMessage =
+  | {
+      readonly family: 'application';
+      readonly kind: 'request' | 'response' | 'error';
+      readonly namespace: string;
+      readonly name: string;
+      readonly id: string;
+      readonly side: TBridgeSide;
+      readonly value?: unknown;
+      readonly error?: Error;
+      readonly failedAt?: string;
+    }
+  | {
+      readonly family: 'control';
+      readonly kind: THandshakeMessage['type'] | 'handshake';
+      readonly namespace: string;
+      readonly side: TBridgeSide;
+      readonly endpointId?: string;
+      readonly targetEndpointId?: string;
+      readonly sessionId?: string;
+      readonly protocolVersion?: number;
+      readonly reason?: THandshakeRejectReason;
+      readonly error?: Error;
+      readonly failedAt?: string;
+    };
+
+/** Middleware for Bridge application transformations and lifecycle observation. */
 export type TBridgeMiddleware = {
+  /** Transforms an outgoing application request before channel submission; may return a Promise. Useful for normalization. */
   onBeforeSend?(namespace: string, messageName: string, request: unknown): unknown | Promise<unknown>;
+  /** Transforms a successful response before `dispatch()` resolves; may return a Promise. Useful for response normalization. */
   onAfterReceive?(namespace: string, messageName: string, response: unknown): unknown | Promise<unknown>;
+  /** Transforms an admitted incoming request before its listener runs; may return a Promise. Useful for input adaptation. */
   onBeforeHandle?(namespace: string, messageName: string, request: unknown): unknown | Promise<unknown>;
+  /** Transforms a listener's successful result before the response is sent; may return a Promise. Useful for output adaptation. */
   onAfterHandle?(namespace: string, messageName: string, response: unknown): unknown | Promise<unknown>;
+  /** Receives application request errors synchronously on the side that observes them; useful for error logging. */
   onError?(namespace: string, messageName: string, error: Error): void;
+  /** Observes captured application and handshake phases asynchronously for tracing; any returned value is ignored. */
+  observe?(message: TObservedMessage, phase: TObservePhase): unknown;
 };
 
 type TMessagePayloadFromNamespace<T> =
@@ -84,9 +135,24 @@ type TResolvedBridgeConfig = {
 };
 
 type TPendingRequest = {
+  trace: TActiveDispatchTrace;
   resolve(value: unknown): void;
   reject(error: Error): void;
   timer: TTimeout | null;
+};
+
+type TDispatchTrace = {
+  id: string;
+  name: string;
+  value: unknown;
+  kind: 'request' | 'response' | 'error';
+  failedAt: string;
+  isFailed: boolean;
+  isCompleted: boolean;
+};
+
+type TActiveDispatchTrace = TDispatchTrace & {
+  abort(error: Error): void;
 };
 
 type TIncomingHandshakeHello = Omit<THandshakeHello, 'protocolVersion'> & { protocolVersion: number };
@@ -286,6 +352,7 @@ export class Bridge<Namespace extends NamespaceMessages, TChannel extends IChann
   private handshakeTimeout: TTimeout | null = null;
   private selectionRetryTimeout: TTimeout | null = null;
   private pendingRequests = new Map<string, TPendingRequest>();
+  private activeDispatches = new Map<string, TActiveDispatchTrace>();
   private messageHandlers = new Map<string, (data: unknown) => Promise<unknown>>();
   private middleware: Array<TBridgeMiddleware> = [];
 
@@ -323,12 +390,40 @@ export class Bridge<Namespace extends NamespaceMessages, TChannel extends IChann
       return Promise.reject(this.toError(error));
     }
 
-    return this.ready().then(() => {
+    const trace: TActiveDispatchTrace = {
+      id: generateMessageId(this.namespace.namespaceName),
+      name: message.name,
+      value: message.payload,
+      kind: 'request',
+      failedAt: 'dispatchStarted',
+      isFailed: false,
+      isCompleted: false,
+      abort: () => undefined,
+    };
+    const aborted = new Promise<never>((_resolve, reject) => {
+      trace.abort = reject;
+    });
+    this.activeDispatches.set(trace.id, trace);
+    this.observeApplication(trace, 'dispatchStarted');
+    trace.failedAt = 'readiness';
+
+    const operation = this.ready().then(() => {
       if (this.isDestroyed || !this.sessionId || !this.peerEndpointId) {
         throw new Error(Bridge.ERRORS.BRIDGE_DESTROYED);
       }
-      return this.dispatchReadyMessage(message);
+      return this.dispatchReadyMessage(message, trace);
     });
+    return Promise.race([operation, aborted]).then(
+      (value) => {
+        this.activeDispatches.delete(trace.id);
+        return value;
+      },
+      (error: unknown) => {
+        this.failApplication(trace, this.toError(error));
+        this.activeDispatches.delete(trace.id);
+        throw error;
+      }
+    );
   }
 
   listen<TMessage extends TMessageAnnotationFromNamespace<Namespace>>(
@@ -376,6 +471,11 @@ export class Bridge<Namespace extends NamespaceMessages, TChannel extends IChann
     this.isProtocolReady = false;
     this.clearHandshakeTimers();
     this.failReadiness(new Error(Bridge.ERRORS.BRIDGE_DESTROYED));
+    this.activeDispatches.forEach((trace) => {
+      const error = new Error(Bridge.ERRORS.BRIDGE_DESTROYED);
+      this.failApplication(trace, error);
+      trace.abort(error);
+    });
     this.pendingRequests.forEach((request) => {
       if (request.timer) {
         clearTimeout(request.timer);
@@ -452,6 +552,7 @@ export class Bridge<Namespace extends NamespaceMessages, TChannel extends IChann
     if ('targetEndpointId' in message && message.targetEndpointId !== this.endpointId) {
       return;
     }
+    this.observeControl(message, 'controlReceived');
     if (this.handleIncompatibleHandshakeMessage(message)) {
       return;
     }
@@ -590,6 +691,9 @@ export class Bridge<Namespace extends NamespaceMessages, TChannel extends IChann
 
   private sendProtocolMessage(message: TInternalMessage): void {
     try {
+      if (message.family === 'control') {
+        this.observeControl(message, 'controlSent');
+      }
       this.channel.send(message);
     } catch (error) {
       this.failReadiness(this.toError(error));
@@ -610,6 +714,7 @@ export class Bridge<Namespace extends NamespaceMessages, TChannel extends IChann
     if (this.isReadinessSettled) {
       return;
     }
+    this.observeControlFailure(error);
     this.isReadinessSettled = true;
     this.isProtocolReady = false;
     this.clearHandshakeTimers();
@@ -633,6 +738,79 @@ export class Bridge<Namespace extends NamespaceMessages, TChannel extends IChann
 
   private hasReadinessFailed(): boolean {
     return this.isReadinessSettled && !this.isProtocolReady;
+  }
+
+  private observeApplication(trace: TDispatchTrace, phase: TObservePhase, error?: Error): void {
+    this.notifyObservers(
+      {
+        family: 'application',
+        kind: trace.kind,
+        namespace: this.namespace.namespaceName,
+        name: trace.name,
+        id: trace.id,
+        side: this.channel.side,
+        value: trace.value,
+        ...(error ? { error, failedAt: trace.failedAt } : {}),
+      },
+      phase
+    );
+  }
+
+  private failApplication(trace: TDispatchTrace, error: Error): void {
+    if (trace.isFailed || trace.isCompleted) {
+      return;
+    }
+    trace.isFailed = true;
+    this.observeApplication(trace, 'failed', error);
+  }
+
+  private observeControl(message: THandshakeMessage | TIncomingHandshakeMessage, phase: TObservePhase): void {
+    this.notifyObservers(
+      {
+        family: 'control',
+        kind: message.type,
+        namespace: message.namespace,
+        side: this.channel.side,
+        endpointId: message.endpointId,
+        protocolVersion: message.protocolVersion,
+        ...('targetEndpointId' in message ? { targetEndpointId: message.targetEndpointId } : {}),
+        ...('sessionId' in message ? { sessionId: message.sessionId } : {}),
+        ...('reason' in message ? { reason: message.reason } : {}),
+      },
+      phase
+    );
+  }
+
+  private observeControlFailure(error: Error): void {
+    this.notifyObservers(
+      {
+        family: 'control',
+        kind: 'handshake',
+        namespace: this.namespace.namespaceName,
+        side: this.channel.side,
+        endpointId: this.endpointId,
+        error,
+        failedAt: 'handshake',
+      },
+      'failed'
+    );
+  }
+
+  private notifyObservers(message: TObservedMessage, phase: TObservePhase): void {
+    const observers = this.middleware.filter((entry) => entry.observe !== undefined);
+    if (observers.length === 0) {
+      return;
+    }
+    void Promise.resolve().then(() => {
+      observers.forEach((entry) => {
+        try {
+          const result = entry.observe?.(Object.freeze({ ...message }), phase);
+          void Promise.resolve(result).catch(() => undefined);
+        } catch {
+          // An observer cannot change the message or handshake outcome.
+        }
+      });
+    });
   }
 
   private validateDispatchMessage<TMessage extends TMessagePayloadFromNamespace<Namespace>>(message: TMessage): void {
@@ -660,79 +838,126 @@ export class Bridge<Namespace extends NamespaceMessages, TChannel extends IChann
   }
 
   private dispatchReadyMessage<TMessage extends TMessagePayloadFromNamespace<Namespace>>(
-    message: TMessage
+    message: TMessage,
+    trace: TActiveDispatchTrace
   ): Promise<TMessageResponseFromNamespace<TMessage['name'], Namespace>> {
     const sessionId = this.sessionId;
     const peerEndpointId = this.peerEndpointId;
 
-    return this.applyBeforeSendMiddleware(message.name, message.payload).then(
-      (processedData) =>
-        new Promise<TMessageResponseFromNamespace<TMessage['name'], Namespace>>((resolve, reject) => {
-          if (this.isDestroyed) {
-            reject(new Error(Bridge.ERRORS.BRIDGE_DESTROYED));
-            return;
-          }
-          if (
-            !this.isProtocolReady ||
-            !sessionId ||
-            !peerEndpointId ||
-            this.sessionId !== sessionId ||
-            this.peerEndpointId !== peerEndpointId
-          ) {
-            reject(new Error(Bridge.ERRORS.CHANNEL_NOT_READY));
-            return;
-          }
-          const messageId = generateMessageId(this.namespace.namespaceName);
-          const pendingRequest: TPendingRequest = {
-            resolve: (response: unknown) => {
-              if (pendingRequest.timer) {
-                clearTimeout(pendingRequest.timer);
-              }
-              this.applyAfterReceiveMiddleware(message.name, response)
-                .then(resolve as (response: unknown) => void)
-                .catch(reject);
-            },
-            reject: (error: Error) => {
-              if (pendingRequest.timer) {
-                clearTimeout(pendingRequest.timer);
-              }
-              this.applyErrorMiddleware(message.name, error);
-              reject(error);
-            },
-            timer: null,
-          };
-          this.pendingRequests.set(messageId, pendingRequest);
+    trace.failedAt = 'onBeforeSend';
+    return this.applyBeforeSendMiddleware(message.name, message.payload).then((processedData) => {
+      trace.value = processedData;
+      trace.failedAt = 'sendPrepared';
+      this.observeApplication(trace, 'sendPrepared');
+      return this.submitRequest<TMessageResponseFromNamespace<TMessage['name'], Namespace>>(
+        message.name,
+        processedData,
+        { trace, sessionId, peerEndpointId }
+      );
+    });
+  }
 
-          const internalMessage: TApplicationMessage = {
-            family: 'application',
-            id: messageId,
-            namespace: this.namespace.namespaceName,
-            name: message.name,
-            endpointId: this.endpointId,
-            targetEndpointId: peerEndpointId,
-            sessionId,
-            sender: this.channel.side,
-            type: 'request',
-            data: processedData,
-          };
+  private submitRequest<Response>(
+    messageName: string,
+    data: unknown,
+    context: { trace: TActiveDispatchTrace; sessionId: TSessionId | null; peerEndpointId: TEndpointId | null }
+  ): Promise<Response> {
+    return new Promise<Response>((resolve, reject) => {
+      const { trace, sessionId, peerEndpointId } = context;
+      trace.failedAt = 'channel';
+      if (this.isDestroyed) {
+        reject(new Error(Bridge.ERRORS.BRIDGE_DESTROYED));
+        return;
+      }
+      if (
+        !this.isProtocolReady ||
+        !sessionId ||
+        !peerEndpointId ||
+        this.sessionId !== sessionId ||
+        this.peerEndpointId !== peerEndpointId
+      ) {
+        reject(new Error(Bridge.ERRORS.CHANNEL_NOT_READY));
+        return;
+      }
+      const pendingRequest = this.createPendingRequest(messageName, trace, { resolve, reject });
+      this.pendingRequests.set(trace.id, pendingRequest);
+      const request: TApplicationMessage = {
+        family: 'application',
+        id: trace.id,
+        namespace: this.namespace.namespaceName,
+        name: messageName,
+        endpointId: this.endpointId,
+        targetEndpointId: peerEndpointId,
+        sessionId,
+        sender: this.channel.side,
+        type: 'request',
+        data,
+      };
+      try {
+        trace.failedAt = 'requestSent';
+        this.observeApplication(trace, 'requestSent');
+        this.channel.send(request);
+      } catch (error) {
+        this.pendingRequests.delete(trace.id);
+        reject(this.toError(error));
+        return;
+      }
+      this.armRequestTimeout(messageName, trace.id, pendingRequest);
+    });
+  }
 
-          try {
-            this.channel.send(internalMessage);
-          } catch (error) {
-            this.pendingRequests.delete(messageId);
-            reject(this.toError(error));
-            return;
-          }
+  private armRequestTimeout(messageName: string, messageId: string, pendingRequest: TPendingRequest): void {
+    if (!this.pendingRequests.has(messageId)) {
+      return;
+    }
+    pendingRequest.timer = setTimeout(() => {
+      if (this.pendingRequests.delete(messageId)) {
+        pendingRequest.reject(new Error(Bridge.ERRORS.TIMEOUT(messageName)));
+      }
+    }, this.config.timeout);
+  }
 
-          if (this.pendingRequests.has(messageId)) {
-            pendingRequest.timer = setTimeout(() => {
-              if (this.pendingRequests.delete(messageId)) {
-                pendingRequest.reject(new Error(Bridge.ERRORS.TIMEOUT(message.name)));
-              }
-            }, this.config.timeout);
-          }
-        })
-    );
+  private createPendingRequest<Response>(
+    messageName: string,
+    trace: TActiveDispatchTrace,
+    settlement: { resolve(value: Response): void; reject(error: Error): void }
+  ): TPendingRequest {
+    const pendingRequest: TPendingRequest = {
+      trace,
+      resolve: (response: unknown) => {
+        if (pendingRequest.timer) {
+          clearTimeout(pendingRequest.timer);
+        }
+        trace.kind = 'response';
+        trace.value = response;
+        trace.failedAt = 'onAfterReceive';
+        this.observeApplication(trace, 'responseReceived');
+        this.applyAfterReceiveMiddleware(messageName, response)
+          .then((finalResponse) => {
+            if (trace.isFailed || this.isDestroyed) {
+              settlement.reject(new Error(Bridge.ERRORS.BRIDGE_DESTROYED));
+              return;
+            }
+            trace.value = finalResponse;
+            trace.failedAt = 'completed';
+            trace.isCompleted = true;
+            this.observeApplication(trace, 'completed');
+            settlement.resolve(finalResponse as Response);
+          })
+          .catch((error: unknown) => {
+            settlement.reject(this.toError(error));
+          });
+      },
+      reject: (error: Error) => {
+        if (pendingRequest.timer) {
+          clearTimeout(pendingRequest.timer);
+        }
+        this.applyErrorMiddleware(messageName, error);
+        settlement.reject(error);
+      },
+      timer: null,
+    };
+    return pendingRequest;
   }
 
   private handleApplicationMessage(message: TApplicationMessage): void {
@@ -749,6 +974,18 @@ export class Bridge<Namespace extends NamespaceMessages, TChannel extends IChann
     }
 
     if (message.type === 'request') {
+      this.observeApplication(
+        {
+          id: message.id,
+          name: message.name,
+          value: message.data,
+          kind: 'request',
+          failedAt: 'requestReceived',
+          isFailed: false,
+          isCompleted: false,
+        },
+        'requestReceived'
+      );
       this.handleRequest(message);
     } else if (message.type === 'response') {
       this.handleResponse(message);
@@ -758,22 +995,54 @@ export class Bridge<Namespace extends NamespaceMessages, TChannel extends IChann
   }
 
   private handleRequest(message: TApplicationMessage & { type: 'request' }): void {
+    const trace: TDispatchTrace = {
+      id: message.id,
+      name: message.name,
+      value: message.data,
+      kind: 'request',
+      failedAt: 'requestReceived',
+      isFailed: false,
+      isCompleted: false,
+    };
     const handlerKey = `${message.namespace}:${message.name}`;
     const handler = this.messageHandlers.get(handlerKey);
     if (!handler) {
-      this.sendErrorResponse(message.id, Bridge.ERRORS.NO_HANDLER(message.name));
+      const error = new Error(Bridge.ERRORS.NO_HANDLER(message.name));
+      trace.failedAt = 'handler';
+      this.failApplication(trace, error);
+      this.sendErrorResponse(message.id, message.name, error.message);
       return;
     }
 
+    trace.failedAt = 'onBeforeHandle';
     this.applyBeforeHandleMiddleware(message.name, message.data)
-      .then((processedData) => handler(processedData))
-      .then((response) => this.applyAfterHandleMiddleware(message.name, response))
-      .then((finalResponse) => {
-        this.sendResponse(message.id, finalResponse);
+      .then((processedData) => {
+        trace.value = processedData;
+        trace.failedAt = 'handlePrepared';
+        this.observeApplication(trace, 'handlePrepared');
+        trace.failedAt = 'handler';
+        return handler(processedData);
       })
-      .catch((error: Error) => {
+      .then((response) => {
+        trace.kind = 'response';
+        trace.value = response;
+        trace.failedAt = 'handled';
+        this.observeApplication(trace, 'handled');
+        trace.failedAt = 'onAfterHandle';
+        return this.applyAfterHandleMiddleware(message.name, response);
+      })
+      .then((finalResponse) => {
+        trace.value = finalResponse;
+        trace.failedAt = 'responsePrepared';
+        this.observeApplication(trace, 'responsePrepared');
+        trace.failedAt = 'responseSent';
+        this.sendResponse(message.id, message.name, finalResponse);
+      })
+      .catch((caught: unknown) => {
+        const error = this.toError(caught);
+        this.failApplication(trace, error);
         this.applyErrorMiddleware(message.name, error);
-        this.sendErrorResponse(message.id, error.message || Bridge.ERRORS.UNKNOWN);
+        this.sendErrorResponse(message.id, message.name, error.message || Bridge.ERRORS.UNKNOWN);
       });
   }
 
@@ -788,21 +1057,49 @@ export class Bridge<Namespace extends NamespaceMessages, TChannel extends IChann
   private handleError(message: TApplicationMessage & { type: 'error' }): void {
     const pendingRequest = this.pendingRequests.get(message.id);
     if (pendingRequest) {
+      pendingRequest.trace.kind = 'error';
+      pendingRequest.trace.value = message.error;
+      pendingRequest.trace.failedAt = 'responseReceived';
+      this.observeApplication(pendingRequest.trace, 'responseReceived');
       pendingRequest.reject(new Error(String(message.error)));
       this.pendingRequests.delete(message.id);
     }
   }
 
-  private sendResponse(messageId: string, data: unknown): void {
+  private sendResponse(messageId: string, messageName: string, data: unknown): void {
     const response = this.createApplicationResponse(messageId, 'response', data);
     if (response) {
+      this.observeApplication(
+        {
+          id: messageId,
+          name: messageName,
+          kind: 'response',
+          value: data,
+          failedAt: 'responseSent',
+          isFailed: false,
+          isCompleted: false,
+        },
+        'responseSent'
+      );
       this.channel.send(response);
     }
   }
 
-  private sendErrorResponse(messageId: string, error: string): void {
+  private sendErrorResponse(messageId: string, messageName: string, error: string): void {
     const response = this.createApplicationResponse(messageId, 'error', error);
     if (response) {
+      this.observeApplication(
+        {
+          id: messageId,
+          name: messageName,
+          kind: 'error',
+          value: error,
+          failedAt: 'responseSent',
+          isFailed: false,
+          isCompleted: false,
+        },
+        'responseSent'
+      );
       this.channel.send(response);
     }
   }

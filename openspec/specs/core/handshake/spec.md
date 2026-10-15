@@ -196,7 +196,7 @@ Before routing an inbound application envelope, a bridge SHALL validate its appl
 
 ### Requirement: Control-frame isolation
 
-Handshake control frames SHALL pass through the channel serializer and transport but SHALL NOT invoke application message handlers, application middleware, or application pending-request resolution.
+Handshake control frames SHALL pass through the channel serializer and transport but SHALL NOT invoke application transformation hooks, application message handlers, or application pending-request resolution. A registered middleware observer SHALL receive lifecycle notifications about submitted control-frame sends, admitted control-frame receives, and handshake failures; its result or failure SHALL NOT affect protocol negotiation.
 
 Before changing handshake state, a bridge SHALL validate the control-frame discriminator, protocol version representation, namespace, endpoint identity, sender role, addressing, session identifier, and rejection reason required by that frame type. Unknown or malformed control frames SHALL be ignored without settling readiness or creating a session.
 
@@ -207,13 +207,14 @@ Before changing handshake state, a bridge SHALL validate the control-frame discr
 
 #### Scenario: Middleware is registered during handshake
 
-- **WHEN** handshake control frames are exchanged while application middleware is registered
-- **THEN** application middleware hooks are not invoked for those control frames
+- **WHEN** handshake control frames are exchanged while application transformation hooks and an observer are registered
+- **THEN** application transformation hooks are not invoked for those control frames
+- **AND** the observer can receive their control-frame lifecycle notifications without changing the handshake
 
 #### Scenario: Unknown control frame is received
 
 - **WHEN** a bridge receives a same-namespace control envelope with an unknown `type`
-- **THEN** it ignores the envelope without rejecting readiness
+- **THEN** it ignores the envelope without rejecting readiness or notifying the observer of an admitted frame
 
 #### Scenario: Selection omits its session identifier
 

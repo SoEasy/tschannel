@@ -271,39 +271,76 @@ replacement, or automatic reconnection.
 
 ### Middleware
 
-Intercept and transform messages at different lifecycle stages:
+`bridge.use()` accepts application transformation hooks and an `observe` hook. Transformation
+hooks return the value passed to the next hook at that stage. They can return a promise;
+the bridge waits for it. The message continues automatically, with no `next()` call.
+
+| Hook             | Runs on                                         | Purpose                                                                 |
+| ---------------- | ----------------------------------------------- | ----------------------------------------------------------------------- |
+| `onBeforeSend`   | Dispatching bridge, before request submission   | Transform an outgoing request.                                          |
+| `onBeforeHandle` | Receiving bridge, before the listener           | Transform an admitted request.                                          |
+| `onAfterHandle`  | Receiving bridge, after the listener            | Transform its successful response before sending.                       |
+| `onAfterReceive` | Dispatching bridge, after a successful response | Transform the value returned by `dispatch()`.                           |
+| `onError`        | Side that observes an application error         | Log or report the error.                                                |
+| `observe`        | Each captured lifecycle phase                   | Trace application exchanges and handshake frames without changing them. |
+
+For a successful `main → worker → main` request, each bridge reports its local phases in this order:
+
+| Main                                                               | Worker                                                           |
+| ------------------------------------------------------------------ | ---------------------------------------------------------------- |
+| `dispatchStarted` — `dispatch()` accepted the request              |                                                                  |
+| `sendPrepared` — outgoing transformation finished                  |                                                                  |
+| `requestSent` — request submitted to `channel.send()`              |                                                                  |
+|                                                                    | `requestReceived` — valid request admitted to the active session |
+|                                                                    | `handlePrepared` — incoming transformation finished              |
+|                                                                    | `handled` — listener returned a response                         |
+|                                                                    | `responsePrepared` — outgoing response transformation finished   |
+|                                                                    | `responseSent` — response submitted to `channel.send()`          |
+| `responseReceived` — valid response admitted to the active session |                                                                  |
+| `completed` — incoming response transformation finished            |                                                                  |
+
+Every phase is reported even when its transformation hook is absent; the value simply passes
+through unchanged. Several hooks at the same stage produce one phase after the entire stage.
+`requestSent` and `responseSent` mean local channel submission, not remote delivery. A
+`responseReceived` event for an error frame is followed by `failed`, not `completed`. Other
+terminal errors, including a missing listener, middleware error, timeout, readiness failure,
+or destruction, also produce `failed` with an error and `failedAt` stage. Each bridge reports
+the failure it sees, so a listener error can appear once on the worker and once on the caller.
+
+Handshake frames produce `controlSent` and `controlReceived` for valid, relevant frames, and
+`failed` if readiness terminates unsuccessfully. Application transformation hooks never run for
+control frames. Invalid, wrong-target, or foreign-session frames do not produce receive phases.
+An observer receives events captured after it was registered; `Bridge` does not replay earlier
+handshake traffic. Observer callbacks run asynchronously in capture order. Their return values,
+thrown errors, and rejected promises do not affect the bridge, and the bridge does not await them.
+The observer's control-frame view is detached from the protocol frame. Treat application payloads
+as read-only too: nested application values are not deep-cloned and must not be mutated in `observe`.
+
+For example, the caller can see a request gain `additional` before it is sent and a string age
+become a number after the response arrives:
 
 ```typescript
 bridge.use({
-  // Before sending a request
   onBeforeSend: (namespace, messageName, request) => {
-    console.log(`Sending ${messageName}:`, request);
-    return request; // Can transform data
+    if (messageName === 'getAge') {
+      return { ...(request as { name: string }), additional: 1 };
+    }
+    return request;
   },
-
-  // After receiving a response
   onAfterReceive: (namespace, messageName, response) => {
-    console.log(`Received response for ${messageName}:`, response);
-    return response; // Can transform data
+    if (messageName === 'getAge') {
+      return { age: Number((response as { age: string }).age) };
+    }
+    return response;
   },
-
-  // Before handling an incoming request
-  onBeforeHandle: (namespace, messageName, request) => {
-    console.log(`Handling ${messageName}:`, request);
-    return request; // Can transform data
-  },
-
-  // After processing and before sending response
-  onAfterHandle: (namespace, messageName, response) => {
-    console.log(`Responding to ${messageName}:`, response);
-    return response; // Can transform data
-  },
-
-  // On any error
-  onError: (namespace, messageName, error) => {
-    console.error(`Error in ${messageName}:`, error);
+  observe: (message, phase) => {
+    console.log(phase, message);
   },
 });
+
+// For getAge: dispatchStarted ({ name: 'getAge' }), sendPrepared
+// ({ name: 'getAge', additional: 1 }), requestSent, responseReceived
+// ({ age: '25' }), completed ({ age: 25 }).
 ```
 
 ### Custom Serialization

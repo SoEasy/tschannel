@@ -25,7 +25,7 @@ export type { TMessageDirection, TBridgeSide } from './types';
 
 // Bridge
 export { Bridge } from './bridge';
-export type { TBridgeConfig, TBridgeMiddleware, THandshakeConfig } from './bridge';
+export type { TBridgeConfig, TBridgeMiddleware, THandshakeConfig, TObservedMessage, TObservePhase } from './bridge';
 
 // Utils
 export { generateMessageId } from './utils';

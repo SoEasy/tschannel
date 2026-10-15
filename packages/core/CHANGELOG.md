@@ -1,5 +1,11 @@
 # @bridge/core
 
+## 0.2.0
+
+### Minor Changes
+
+- Add middleware lifecycle observation for application messages and handshake frames.
+
 ## 0.1.0
 
 ### Minor Changes

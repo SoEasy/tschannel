@@ -1,5 +1,11 @@
 # @bridge/iframe-channel
 
+## 0.0.5
+
+### Patch Changes
+
+- Allow `@tschannel/core` 0.2.x as a peer dependency.
+
 ## 0.0.4
 
 ### Patch Changes
