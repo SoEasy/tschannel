@@ -27,5 +27,6 @@ export interface IChannel<TSide extends TBridgeSide> {
  */
 export type TChannelConfig<TSide extends TBridgeSide> = {
   side: TSide;
+
   serializer?: TSerializer;
 };

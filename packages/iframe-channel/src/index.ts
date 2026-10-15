@@ -81,12 +81,19 @@ export type TIframeChannelConfig<TSide extends TBridgeSide> = TChannelConfig<TSi
  */
 export class IframeChannel<TSide extends TBridgeSide> implements IChannel<TSide> {
   readonly side: TSide;
+
   private messageHandler?: (message: TInternalMessage) => void;
+
   private isInitialized = false;
+
   private serializer: TSerializer;
+
   private readonly targetOrigin: string;
+
   private readonly expectedOrigin?: string;
+
   private readonly targetWindow: Window;
+
   private readonly silent: boolean;
 
   /**

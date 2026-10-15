@@ -9,6 +9,7 @@ const typescriptEslint = require('@typescript-eslint/eslint-plugin');
 const globals = require('globals');
 const js = require('@eslint/js');
 const { FlatCompat } = require('@eslint/eslintrc');
+const linesBetweenTypeMembers = require('./scripts/eslint-rules/lines-between-type-members.cjs');
 
 const compat = new FlatCompat({
   baseDirectory: __dirname,
@@ -33,6 +34,11 @@ module.exports = defineConfig([
 
     plugins: {
       '@typescript-eslint': typescriptEslint,
+      local: {
+        rules: {
+          'lines-between-type-members': linesBetweenTypeMembers,
+        },
+      },
     },
 
     extends: compat.extends(
@@ -337,6 +343,12 @@ module.exports = defineConfig([
 
       // Method signature style
       '@typescript-eslint/method-signature-style': ['error', 'method'],
+
+      // ============================================
+      // Visual code style
+      // ============================================
+      'lines-between-class-members': ['error', { enforce: [{ blankLine: 'always', prev: 'field', next: 'field' }] }],
+      'local/lines-between-type-members': 'error',
     },
   },
 

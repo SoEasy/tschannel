@@ -11,39 +11,57 @@ export type THandshakeRejectReason = 'incompatible-version' | 'busy' | 'invalid-
 
 export type TProtocolMessageBase = {
   namespace: string;
+
   sender: TBridgeSide;
+
   endpointId: TEndpointId;
 };
 
 export type THandshakeHello = TProtocolMessageBase & {
   family: 'control';
+
   type: 'hello';
+
   protocolVersion: TProtocolVersion;
 };
 
 export type THandshakeSelect = TProtocolMessageBase & {
   family: 'control';
+
   type: 'select';
+
   protocolVersion: TProtocolVersion;
+
   sender: 'main';
+
   targetEndpointId: TEndpointId;
+
   sessionId: TSessionId;
 };
 
 export type THandshakeConnected = TProtocolMessageBase & {
   family: 'control';
+
   type: 'connected';
+
   protocolVersion: TProtocolVersion;
+
   sender: 'worker';
+
   targetEndpointId: TEndpointId;
+
   sessionId: TSessionId;
 };
 
 export type THandshakeReject = TProtocolMessageBase & {
   family: 'control';
+
   type: 'reject';
+
   protocolVersion: TProtocolVersion;
+
   targetEndpointId: TEndpointId;
+
   reason: THandshakeRejectReason;
 };
 
@@ -54,9 +72,13 @@ export type THandshakeMessage = THandshakeHello | THandshakeSelect | THandshakeC
  */
 export type TApplicationMessage = TProtocolMessageBase & {
   family: 'application';
+
   id: string;
+
   name: string;
+
   targetEndpointId: TEndpointId;
+
   sessionId: TSessionId;
 } & ({ type: 'request'; data: unknown } | { type: 'response'; data: unknown } | { type: 'error'; error: unknown });
 
@@ -70,6 +92,7 @@ export type TInternalMessage = TApplicationMessage | THandshakeMessage;
  */
 export type TSerializer = {
   serialize(message: TInternalMessage): unknown;
+
   deserialize(data: unknown): TInternalMessage;
 };
 

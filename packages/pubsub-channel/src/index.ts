@@ -51,10 +51,15 @@ export type TPubSubChannelConfig<TSide extends TBridgeSide> = TChannelConfig<TSi
  */
 export class PubSubChannel<TSide extends TBridgeSide> implements IChannel<TSide> {
   readonly side: TSide;
+
   private messageHandler?: (message: TInternalMessage) => void;
+
   private isInitialized = false;
+
   private serializer: TSerializer;
+
   private boundHandleEvent: (event: Event) => void;
+
   private readonly eventTarget: EventTarget;
 
   // Shared global EventTarget for default communication

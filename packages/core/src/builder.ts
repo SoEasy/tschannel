@@ -2,12 +2,15 @@ import type { TMessageDirection, TMessageObjectType } from './types';
 
 type TMessageMeta = {
   direction: TMessageDirection;
+
   type: TMessageObjectType;
 };
 
 type TMessageDefinition<TRequest = unknown, TResponse = unknown> = {
   request: TRequest;
+
   response: TResponse;
+
   meta: TMessageMeta;
 };
 
@@ -30,7 +33,9 @@ export class NamespaceBuilder<TNamespaceName extends string, TMessages extends T
     TMessages & {
       [key in TMessageName]: {
         request: TReq;
+
         response: TRes;
+
         meta: { direction: 'mainToWorker'; type: TMessageObjectType };
       };
     }
@@ -42,7 +47,9 @@ export class NamespaceBuilder<TNamespaceName extends string, TMessages extends T
       TMessages & {
         [key in TMessageName]: {
           request: TReq;
+
           response: TRes;
+
           meta: { direction: 'mainToWorker'; type: TMessageObjectType };
         };
       }
@@ -55,7 +62,9 @@ export class NamespaceBuilder<TNamespaceName extends string, TMessages extends T
             TMessageName,
             {
               request: TReq;
+
               response: TRes;
+
               meta: { direction: 'mainToWorker'; type: TMessageObjectType };
             }
           >
@@ -74,7 +83,9 @@ export class NamespaceBuilder<TNamespaceName extends string, TMessages extends T
     TMessages & {
       [key in TMessageName]: {
         request: TReq;
+
         response: TRes;
+
         meta: { direction: 'workerToMain'; type: TMessageObjectType };
       };
     }
@@ -86,7 +97,9 @@ export class NamespaceBuilder<TNamespaceName extends string, TMessages extends T
       TMessages & {
         [key in TMessageName]: {
           request: TReq;
+
           response: TRes;
+
           meta: { direction: 'workerToMain'; type: TMessageObjectType };
         };
       }
@@ -99,7 +112,9 @@ export class NamespaceBuilder<TNamespaceName extends string, TMessages extends T
             TMessageName,
             {
               request: TReq;
+
               response: TRes;
+
               meta: { direction: 'workerToMain'; type: TMessageObjectType };
             }
           >
@@ -118,7 +133,9 @@ export class NamespaceBuilder<TNamespaceName extends string, TMessages extends T
     TMessages & {
       [key in TMessageName]: {
         request: TReq;
+
         response: TRes;
+
         meta: { direction: 'bidirectional'; type: TMessageObjectType };
       };
     }
@@ -130,7 +147,9 @@ export class NamespaceBuilder<TNamespaceName extends string, TMessages extends T
       TMessages & {
         [key in TMessageName]: {
           request: TReq;
+
           response: TRes;
+
           meta: { direction: 'bidirectional'; type: TMessageObjectType };
         };
       }
@@ -143,7 +162,9 @@ export class NamespaceBuilder<TNamespaceName extends string, TMessages extends T
             TMessageName,
             {
               request: TReq;
+
               response: TRes;
+
               meta: { direction: 'bidirectional'; type: TMessageObjectType };
             }
           >
@@ -158,7 +179,9 @@ export class NamespaceBuilder<TNamespaceName extends string, TMessages extends T
 
 export type TMessageBase<TNamespaceName extends string, TMessageName extends string> = {
   namespace: TNamespaceName;
+
   name: TMessageName;
+
   meta: TMessageMeta;
 };
 
@@ -171,6 +194,7 @@ export type TMessageToListen<
   TMessageBase<TNamespaceName, TMessageName> & {
     meta: {
       direction: TDirection;
+
       type: 'forListen';
     };
   }
@@ -185,8 +209,10 @@ export type TMessageToSend<
 > = Readonly<
   TMessageBase<TNamespaceName, TMessageName> & {
     payload: TRequest;
+
     meta: {
       direction: TDirection;
+
       type: 'forSend';
     };
   }
@@ -212,6 +238,7 @@ export class NamespaceMessages<
   TMessages extends { [messageName: string]: TMessageDefinition } = any,
 > {
   private messageObjectCache?: TMessageIdentifiers<TNamespaceName, TMessages>;
+
   private sendObjectCache?: TSendMethods<TNamespaceName, TMessages>;
 
   constructor(
